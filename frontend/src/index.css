@@ -1,0 +1,765 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --main-color: #84c602 !important;
+  --main-color-hover: #9bdc02 !important;
+  --dark-bg-1: #000000 !important;
+  --dark-bg-2: #03373d !important;
+  --light-bg: #e9efef !important;
+  --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--main-color);
+}
+
+/* Base Body Styles */
+body {
+  font-family: 'Poppins', 'Jost', sans-serif !important;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography Enhancements (Without overriding section-specific colors) */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', 'Jost', sans-serif !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+p, span, li, a {
+  font-family: 'Poppins', 'Jost', sans-serif;
+  line-height: 1.6;
+}
+
+/* Premium Card Designs - Respect original backgrounds for contrast */
+.card, .tab-pane .card, .support-first-bx, .faq-list ul li {
+  border-radius: 16px !important;
+  transition: var(--transition-smooth) !important;
+}
+
+.card:hover, .tab-pane .card:hover, .support-first-bx:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(132, 198, 2, 0.15) !important;
+}
+
+/* Custom Button Enhancements - Dark text for maximum readability on lime background */
+.btn, .hero-btn, .prfl-button, .btn-primary {
+  background: var(--main-color) !important;
+  color: #0a1401 !important; /* High contrast dark text on lime green */
+  font-weight: 600 !important;
+  padding: 12px 28px !important;
+  border-radius: 50px !important;
+  transition: var(--transition-smooth) !important;
+  border: 1px solid transparent !important;
+  box-shadow: 0 4px 14px rgba(132, 198, 2, 0.3) !important;
+}
+
+.btn:hover, .hero-btn:hover, .prfl-button:hover, .btn-primary:hover {
+  background: var(--main-color-hover) !important;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 20px rgba(132, 198, 2, 0.5) !important;
+  color: #0a1401 !important;
+}
+
+/* Forms & Inputs - Enforce dark text color for visibility */
+input, textarea, select {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important; /* Ensure typed text is dark slate */
+  border-radius: 10px !important;
+  padding: 14px !important;
+  transition: var(--transition-smooth) !important;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--main-color) !important;
+  box-shadow: 0 0 10px rgba(132, 198, 2, 0.2) !important;
+  outline: none !important;
+}
+
+/* Navigation Menu - Seamless dark */
+.header-section {
+  background: #000 !important;
+  backdrop-filter: none;
+  border-bottom: none;
+  transition: var(--transition-smooth);
+}
+
+.header-section.bg-black {
+  background: #000 !important;
+  box-shadow: none;
+}
+
+/* Navigation Links font styling */
+.header-nav li a {
+  font-weight: 500 !important;
+  font-size: 15px !important;
+  transition: var(--transition-smooth);
+}
+
+/* Main Navbar Link Colors (White for Black Header background) */
+.header-nav > li > a {
+  color: #ffffff !important;
+}
+
+/* Dropdown Menu Link Colors (White for Black Dropdown background) */
+.header-nav .submenu a {
+  color: #ffffff !important;
+}
+
+/* Hover states on main links and submenus */
+.header-nav > li > a:hover,
+.header-nav .submenu a:hover {
+  color: var(--main-color) !important;
+}
+
+/* Sidebar Drawer - Light */
+.prfl-sidebar {
+  background: #ffffff !important;
+  backdrop-filter: blur(20px);
+  border-left: 1px solid #e2e8f0;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Step Progress design */
+.step-bx-1 {
+  border-color: var(--main-color) !important;
+}
+.step-bx-1.active {
+  box-shadow: 0 0 15px var(--main-color);
+}
+.progress-div:hover .step-bx-1 {
+  transform: scale(1.1);
+}
+
+/* FAQ Accordion Styling */
+.faq-list ul li {
+  margin-bottom: 15px !important;
+  background: #f8fafc !important;
+}
+.faq-list ul li a {
+  font-weight: 600 !important;
+}
+.faq-list ul li a:hover {
+  color: var(--main-color) !important;
+}
+.faq-list ul li.active {
+  border-color: var(--main-color) !important;
+}
+
+/* Custom CSS Logo Marquee for Partner Page */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+.logo-marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  width: 100%;
+  padding: 20px 0;
+}
+.logo-marquee-content {
+  display: inline-block;
+  animation: marquee 25s linear infinite;
+  white-space: nowrap;
+}
+.logo-marquee-item {
+  display: inline-block;
+  margin: 0 40px;
+}
+.logo-marquee-item img {
+  height: 50px;
+  width: auto;
+  opacity: 0.7;
+  filter: grayscale(100%) brightness(200%);
+  transition: all 0.3s ease;
+}
+.logo-marquee-item img:hover {
+  opacity: 1;
+  filter: none;
+}
+
+/* Compact Inner Page Banners & Spacing Fixes */
+.about-banner-bg,
+.partners-banner-bg,
+.industry-banner-bg,
+.support-banner-bg,
+.contact-banner-bg {
+  height: 320px !important;
+}
+.about-banner-bg::before,
+.partners-banner-bg::before,
+.industry-banner-bg::before,
+.support-banner-bg::before,
+.contact-banner-bg::before {
+  height: 320px !important;
+}
+.about-banner-bg .heading-div,
+.partners-banner-bg .heading-div,
+.industry-banner-bg .heading-div,
+.support-banner-bg .heading-div,
+.contact-banner-bg .heading-div,
+.main-banner-bg .heading-div {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+/* Polished Card Hover Transitions & Shadows */
+.main-bx, .img-slider-1, .pg-card-desc {
+  transition: var(--transition-smooth) !important;
+}
+.main-bx:hover, .img-slider-1:hover {
+  transform: translateY(-8px) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+}
+.img-slider-1 img {
+  transition: transform 0.5s ease;
+}
+.img-slider-1:hover img {
+  transform: scale(1.03);
+}
+
+/* General spacing improvements */
+.works-on-sec {
+  padding: 60px 0 !important;
+}
+.why-us-sec {
+  padding-top: 50px !important;
+  padding-bottom: 50px !important;
+}
+
+/* Card Description Font Weight Fix */
+.choose-payment-sec .features-items .item h5,
+.choose-payment-sec .item-bx .item h5,
+.choose-payment-sec .item h5,
+.choose-payment-sec .item h6,
+.info h5,
+.info h6,
+.card-text h5,
+.card-text h6,
+.process-bx h5,
+.process-bx h6,
+.card_pg_text,
+.edu_card_bx h5,
+.edu_card_bx h6,
+.left-info h5,
+.left-info h6 {
+  font-weight: normal !important;
+}
+
+/* Redesigned Login Page Custom Styles */
+.login-page-wrapper {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Login Page Specific Inputs Overrides */
+.login-page-wrapper input {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+}
+
+.login-page-wrapper input:focus {
+  border-color: var(--main-color) !important;
+  box-shadow: 0 0 12px rgba(132, 198, 2, 0.25) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Autofill styling override to prevent default browser styling from breaking dark mode */
+.login-page-wrapper input:-webkit-autofill,
+.login-page-wrapper input:-webkit-autofill:hover,
+.login-page-wrapper input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0px 1000px #091214 inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Ambient Moving Blurs */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-40px) scale(1.1); }
+}
+.animate-float-slow {
+  animation: float-slow 15s ease-in-out infinite;
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0) scale(1.1); }
+  50% { transform: translateY(40px) scale(1); }
+}
+.animate-float-reverse {
+  animation: float-reverse 18s ease-in-out infinite;
+}
+
+/* Glassmorphism Styles */
+.glass-login-card {
+  background: rgba(255, 255, 255, 0.02) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.mock-dashboard-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-dashboard-card:hover {
+  transform: translateY(-8px) rotate(0.5deg);
+}
+
+.chart-bar-glow {
+  background: linear-gradient(180deg, var(--main-color) 0%, rgba(132, 198, 2, 0.1) 100%) !important;
+  box-shadow: 0 4px 15px rgba(132, 198, 2, 0.3);
+  border-radius: 4px 4px 0 0;
+}
+
+/* ZyqraPay Premium Dark-Themed Dashboard Layout Styles */
+.zyqrapay-dashboard-wrapper {
+  background: radial-gradient(circle at 50% 50%, #0d121f 0%, #080a12 100%) !important;
+  color: #cbd5e1 !important;
+  font-size: 13px !important;
+}
+
+.zyqrapay-dashboard-wrapper h1,
+.zyqrapay-dashboard-wrapper .fs-1 {
+  font-size: 2rem !important;
+  color: #f8fafc !important;
+}
+
+.zyqrapay-dashboard-wrapper h2,
+.zyqrapay-dashboard-wrapper .fs-2 {
+  font-size: 1.5rem !important;
+  color: #f8fafc !important;
+}
+
+.zyqrapay-dashboard-wrapper h3,
+.zyqrapay-dashboard-wrapper .fs-3 {
+  font-size: 1.25rem !important;
+  color: #f8fafc !important;
+}
+
+.zyqrapay-dashboard-wrapper h4,
+.zyqrapay-dashboard-wrapper .fs-4 {
+  font-size: 1.05rem !important;
+  color: #f8fafc !important;
+}
+
+.zyqrapay-dashboard-wrapper h5,
+.zyqrapay-dashboard-wrapper .fs-5 {
+  font-size: 0.95rem !important;
+  color: #f8fafc !important;
+}
+
+.zyqrapay-dashboard-wrapper h6,
+.zyqrapay-dashboard-wrapper .fs-6 {
+  font-size: 0.8rem !important;
+  color: #94a3b8 !important;
+}
+
+.zyqrapay-dashboard-wrapper .fs-7 {
+  font-size: 0.78rem !important;
+}
+
+.zyqrapay-dashboard-wrapper .fs-8 {
+  font-size: 0.7rem !important;
+}
+
+.zyqrapay-dashboard-wrapper .fs-9 {
+  font-size: 0.62rem !important;
+}
+
+/* Base text overrides */
+.zyqrapay-dashboard-wrapper .text-dark {
+  color: #f8fafc !important;
+}
+
+.zyqrapay-dashboard-wrapper .text-secondary {
+  color: #94a3b8 !important;
+}
+
+.zyqrapay-dashboard-wrapper .btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2) !important;
+  font-weight: 600 !important;
+  border: none !important;
+  font-size: 0.8rem !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.zyqrapay-dashboard-wrapper .btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35) !important;
+  transform: translateY(-1px) !important;
+  color: #ffffff !important;
+}
+
+/* Sidebar Styling */
+.zyqrapay-dashboard-wrapper aside {
+  background-color: #0c0f18 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.zyqrapay-dashboard-wrapper aside .bg-white {
+  background-color: #0c0f18 !important;
+}
+
+.zyqrapay-dashboard-wrapper aside .border-bottom,
+.zyqrapay-dashboard-wrapper aside .border-top {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Sidebar Buttons */
+.zyqrapay-dashboard-wrapper aside .btn {
+  background: transparent !important;
+  color: #94a3b8 !important;
+  border-radius: 8px !important;
+  padding: 6px 12px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+
+.zyqrapay-dashboard-wrapper aside .btn.bg-dark {
+  background: #1e293b !important;
+  color: #ffffff !important;
+}
+
+.zyqrapay-dashboard-wrapper aside .btn.bg-dark:hover {
+  background: #334155 !important;
+  color: #ffffff !important;
+}
+
+.zyqrapay-dashboard-wrapper aside .nav-link {
+  background: transparent !important;
+  color: #94a3b8 !important;
+  border-radius: 8px !important;
+  margin-bottom: 4px !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.zyqrapay-dashboard-wrapper aside .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  color: #f8fafc !important;
+  transform: translateX(4px);
+}
+
+.zyqrapay-dashboard-wrapper aside .nav-link.bg-light {
+  background: linear-gradient(90deg, rgba(2, 132, 199, 0.15) 0%, rgba(2, 132, 199, 0.03) 100%) !important;
+  color: #38bdf8 !important;
+  border-left: 3px solid #0ea5e9 !important;
+  border-radius: 0 8px 8px 0 !important;
+  padding-left: 13px !important;
+  font-weight: 600 !important;
+}
+
+.zyqrapay-dashboard-wrapper aside .nav-link.text-danger:hover {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  color: #f87171 !important;
+}
+
+/* Segmented Language Selector */
+.zyqrapay-dashboard-wrapper aside div[style*="background-color"] {
+  background-color: #111625 !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Balance Banner */
+.zyqrapay-dashboard-wrapper .rounded-4[style*="linear-gradient"] {
+  background: linear-gradient(135deg, #0f1c3f 0%, #0a2e30 50%, #0c1b1c 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+}
+
+.zyqrapay-dashboard-wrapper .rounded-4[style*="linear-gradient"]::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.zyqrapay-dashboard-wrapper .btn-light {
+  background: #ffffff !important;
+  color: #0d9488 !important;
+  border-radius: 8px !important;
+  padding: 10px 20px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.2s ease !important;
+}
+
+.zyqrapay-dashboard-wrapper .btn-light:hover {
+  background: #f1f5f9 !important;
+  color: #0f766e !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Top Nav Header */
+.zyqrapay-dashboard-wrapper header {
+  background: rgba(12, 15, 24, 0.75) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+.zyqrapay-dashboard-wrapper .flex-grow-1.bg-light {
+  background-color: #080a12 !important;
+}
+
+.zyqrapay-dashboard-wrapper main {
+  background-color: #080a12 !important;
+}
+
+/* Card Styling */
+.zyqrapay-dashboard-wrapper .card {
+  background-color: #111625 !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.zyqrapay-dashboard-wrapper .card:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(14, 165, 233, 0.2) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35), 0 0 15px rgba(14, 165, 233, 0.05) !important;
+}
+
+/* Metric card icon wrappers */
+.zyqrapay-dashboard-wrapper .bg-primary.bg-opacity-10 {
+  background-color: rgba(14, 165, 233, 0.15) !important;
+  color: #38bdf8 !important;
+}
+
+.zyqrapay-dashboard-wrapper .bg-success.bg-opacity-10 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+}
+
+.zyqrapay-dashboard-wrapper .bg-warning.bg-opacity-10 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+}
+
+.zyqrapay-dashboard-wrapper .bg-info.bg-opacity-10 {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  color: #818cf8 !important;
+}
+
+/* Credentials visual boxes */
+.zyqrapay-dashboard-wrapper .bg-light.border-light-subtle {
+  background-color: #161c2e !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.zyqrapay-dashboard-wrapper .font-monospace {
+  color: #38bdf8 !important;
+}
+
+/* Table Styling */
+.zyqrapay-dashboard-wrapper .table {
+  color: #cbd5e1 !important;
+}
+
+.zyqrapay-dashboard-wrapper thead,
+.zyqrapay-dashboard-wrapper thead.bg-light,
+.zyqrapay-dashboard-wrapper .bg-light.bg-opacity-50 {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.zyqrapay-dashboard-wrapper .table th {
+  color: #cbd5e1 !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.68rem !important;
+  background: transparent !important;
+}
+
+.zyqrapay-dashboard-wrapper .table td {
+  color: #cbd5e1 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  background: transparent !important;
+  font-size: 0.8rem !important;
+}
+
+.zyqrapay-dashboard-wrapper .table tbody tr {
+  transition: background-color 0.2s ease !important;
+}
+
+.zyqrapay-dashboard-wrapper .table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Badge styling */
+.zyqrapay-dashboard-wrapper .badge {
+  font-weight: 500 !important;
+  padding: 5px 10px !important;
+  border-radius: 9999px !important;
+  font-size: 0.68rem !important;
+}
+
+.zyqrapay-dashboard-wrapper .badge.bg-warning.bg-opacity-10 {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.2) !important;
+}
+
+.zyqrapay-dashboard-wrapper .badge.bg-success.bg-opacity-10 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+}
+
+.zyqrapay-dashboard-wrapper .badge.bg-danger.bg-opacity-10 {
+  background-color: rgba(239, 68, 68, 0.12) !important;
+  color: #f87171 !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+}
+
+/* Forms & Inputs */
+.zyqrapay-dashboard-wrapper .form-control {
+  background-color: #161c2e !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  font-size: 0.82rem !important;
+  transition: all 0.3s ease !important;
+}
+
+.zyqrapay-dashboard-wrapper .form-control:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15) !important;
+  background-color: #1a2238 !important;
+}
+
+.zyqrapay-dashboard-wrapper .form-control::placeholder {
+  color: #64748b !important;
+}
+
+/* Alerts and banners */
+.zyqrapay-dashboard-wrapper .alert-success {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+  border: 1px solid rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+}
+
+.zyqrapay-dashboard-wrapper .alert-warning {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+  border: 1px solid rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+}
+
+/* Modal Styling */
+.zyqrapay-dashboard-wrapper .position-fixed[style*="rgba(15, 23, 42, 0.6)"] {
+  background-color: rgba(3, 7, 18, 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+.zyqrapay-dashboard-wrapper .position-fixed .card {
+  background-color: #111625 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.zyqrapay-dashboard-wrapper .btn-close {
+  filter: invert(1) !important;
+}
+
+@media (min-width: 992px) {
+  .zyqrapay-dashboard-wrapper aside {
+    position: sticky !important;
+    top: 0 !important;
+    height: 100vh !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* Custom Overrides for Filter Dropdowns & Code Pre Snippets */
+.zyqrapay-dashboard-wrapper div.bg-white.border.border-light-subtle {
+  background-color: #161c2e !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #cbd5e1 !important;
+}
+
+.zyqrapay-dashboard-wrapper div.bg-white.border.border-light-subtle span {
+  color: #cbd5e1 !important;
+}
+
+.zyqrapay-dashboard-wrapper div.bg-white.border.border-light-subtle:hover {
+  background-color: #1a2238 !important;
+}
+
+.zyqrapay-dashboard-wrapper .position-absolute.end-0.mt-1.bg-white {
+  background-color: #111625 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.zyqrapay-dashboard-wrapper .position-absolute.end-0.mt-1.bg-white span {
+  color: #cbd5e1 !important;
+}
+
+.zyqrapay-dashboard-wrapper .position-absolute.end-0.mt-1.bg-white .bg-light {
+  background-color: rgba(56, 189, 248, 0.15) !important;
+}
+
+.zyqrapay-dashboard-wrapper .position-absolute.end-0.mt-1.bg-white .bg-light span {
+  color: #38bdf8 !important;
+}
+
+.zyqrapay-dashboard-wrapper .position-absolute.end-0.mt-1.bg-white div:hover:not(.bg-light) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.zyqrapay-dashboard-wrapper pre {
+  background-color: #0c101d !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #38bdf8 !important;
+}
+
+/* Metric card text and icon fixes */
+.zyqrapay-dashboard-wrapper .bg-danger.bg-opacity-10 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+}
+
+.zyqrapay-dashboard-wrapper .card span.text-secondary {
+  color: #94a3b8 !important;
+}
