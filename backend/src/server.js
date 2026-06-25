@@ -15,10 +15,11 @@ const PORT = process.env.PORT || 4000;
 
 // Enable CORS
 app.use(cors({
-  origin: '*', // Customize to fit your production architecture if needed
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-client-id', 'x-client-password', 'x-admin-key']
 }));
+
 
 // Helmet security headers (with adjustments for development/proxies if necessary)
 app.use(helmet());

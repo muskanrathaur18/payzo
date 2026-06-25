@@ -3,16 +3,12 @@
 #  IMPORTANT: .env files kabhi bhi commit mat karo!
 # ============================================================
 
-# ----- Environment Variables (NEVER COMMIT) -----
-.env
-.env.*
-!.env.example
-backend/.env
-backend/.env.*
-!backend/.env.example
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
+# ----- Environment Variables -----
+# .env files are included intentionally
+!.env
+!.env.*
+!backend/.env
+!frontend/.env
 
 # ----- Node.js -----
 node_modules/

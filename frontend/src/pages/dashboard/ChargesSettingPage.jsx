@@ -1,5 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Calculator, Edit3, Play, Plus, Save } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Calculator, Edit3, Play, Plus, Save, Trash2 } from 'lucide-react';
+
+const API_BASE = 'http://localhost:4000/api/v1/admin';
+const ADMIN_KEY = 'fastpay_admin_secret_key_9983';
+
+const apiFetch = (path, options = {}) =>
+  fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY, ...(options.headers || {}) },
+  }).then(r => r.json());
 
 const DEFAULT_PROFILE = {
   mode: 'Fixed',
@@ -17,18 +26,9 @@ const DEFAULT_RANGE_FORM = {
   status: 'Active',
 };
 
-const STORAGE_KEY = 'admin_charge_profiles';
-
 export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
   const [activeService, setActiveService] = useState('Pay In');
-  const [savedProfiles, setSavedProfiles] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : {};
-    } catch (error) {
-      return {};
-    }
-  });
+  const [savedProfiles, setSavedProfiles] = useState({});
   const [editingProfiles, setEditingProfiles] = useState({});
   const [mode, setMode] = useState(DEFAULT_PROFILE.mode);
   const [status, setStatus] = useState(DEFAULT_PROFILE.status);
@@ -40,6 +40,8 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
   const [rangeDraft, setRangeDraft] = useState(DEFAULT_RANGE_FORM);
   const [rangesByService, setRangesByService] = useState({});
   const [rangeError, setRangeError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingRange, setIsSavingRange] = useState(false);
   const savedProfile = savedProfiles[activeService];
   const isProfileSaved = Boolean(savedProfile);
   const isEditingProfile = editingProfiles[activeService] ?? !isProfileSaved;
@@ -111,6 +113,46 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
   };
   const content = serviceContent[activeService];
 
+  // Load profile + ranges from DB whenever tab changes
+  const loadServiceData = useCallback(async (service) => {
+    const svcKey = service.toLowerCase().replace(' ', '_');
+    try {
+      const [profRes, rangesRes] = await Promise.all([
+        apiFetch(`/charges/profile/${svcKey}`),
+        apiFetch(`/charges/ranges/${svcKey}`),
+      ]);
+      const profile = profRes.success && profRes.profile
+        ? {
+            mode: profRes.profile.mode || DEFAULT_PROFILE.mode,
+            status: profRes.profile.status || DEFAULT_PROFILE.status,
+            rateType: profRes.profile.rate_type || DEFAULT_PROFILE.rateType,
+            rateValue: String(profRes.profile.rate_value ?? DEFAULT_PROFILE.rateValue),
+          }
+        : DEFAULT_PROFILE;
+
+      setSavedProfiles(prev => ({ ...prev, [service]: profile }));
+
+      // Always update ranges — even empty array clears stale data
+      const ranges = (rangesRes.success && Array.isArray(rangesRes.ranges)) ? rangesRes.ranges : [];
+      setRangesByService(prev => ({ ...prev, [service]: ranges }));
+
+      if (!rangesRes.success) {
+        console.error('Ranges fetch failed:', rangesRes.message);
+        setRangeError(rangesRes.message || 'Failed to load ranges.');
+      }
+    } catch (err) {
+      console.error('Failed to load service data:', err);
+      setRangeError('Network error loading data. Check if backend is running.');
+    }
+  }, []);
+
+  useEffect(() => {
+    loadServiceData(activeService);
+    setRangeFormOpen(false);
+    setRangeDraft(DEFAULT_RANGE_FORM);
+    setRangeError('');
+  }, [activeService, loadServiceData]);
+
   useEffect(() => {
     const profile = savedProfiles[activeService] || DEFAULT_PROFILE;
     setMode(profile.mode);
@@ -126,9 +168,6 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
       netPayout: Math.max(nextAmount - nextCharge, 0),
       rule: `${profile.mode} - ${profile.rateType}`,
     });
-    setRangeFormOpen(false);
-    setRangeDraft(DEFAULT_RANGE_FORM);
-    setRangeError('');
   }, [activeService, savedProfiles]);
 
   useEffect(() => {
@@ -137,32 +176,47 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
     return () => window.clearTimeout(timeoutId);
   }, [rangeError]);
 
-  const handleProfileAction = () => {
+  const handleProfileAction = async () => {
     if (isFormLocked) {
       setEditingProfiles(prev => ({ ...prev, [activeService]: true }));
       return;
     }
 
-    const profile = {
-      mode,
-      status,
-      rateType: isDynamicMode ? '' : rateType,
-      rateValue: isDynamicMode ? '0' : String(Math.max(Number(rateValue) || 0, 0)),
-      savedAt: new Date().toISOString(),
-    };
-    const nextProfiles = { ...savedProfiles, [activeService]: profile };
-    setSavedProfiles(nextProfiles);
-    setEditingProfiles(prev => ({ ...prev, [activeService]: false }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProfiles));
-    onSaved?.();
+    setIsSaving(true);
+    try {
+      const payload = {
+        service: activeService,
+        mode,
+        status,
+        rateType: isDynamicMode ? '' : rateType,
+        rateValue: isDynamicMode ? 0 : Math.max(Number(rateValue) || 0, 0),
+      };
+      const res = await apiFetch('/charges/profile', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (res.success) {
+        const profile = {
+          mode,
+          status,
+          rateType: isDynamicMode ? '' : rateType,
+          rateValue: isDynamicMode ? '0' : String(Math.max(Number(rateValue) || 0, 0)),
+        };
+        setSavedProfiles(prev => ({ ...prev, [activeService]: profile }));
+        setEditingProfiles(prev => ({ ...prev, [activeService]: false }));
+        onSaved?.();
+      } else {
+        setRangeError(res.message || 'Failed to save profile.');
+      }
+    } catch (err) {
+      setRangeError('Network error saving profile.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleCancel = () => {
-    const profile = savedProfiles[activeService] || DEFAULT_PROFILE;
-    setMode(profile.mode);
-    setStatus(profile.status);
-    setRateType(profile.rateType);
-    setRateValue(profile.rateValue);
+  const handleCancel = async () => {
+    await loadServiceData(activeService);
     setEditingProfiles(prev => ({ ...prev, [activeService]: false }));
   };
 
@@ -194,7 +248,7 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
     setRangeError('');
   };
 
-  const handleSaveRange = () => {
+  const handleSaveRange = async () => {
     const requiredFields = [
       rangeDraft.minAmount,
       rangeDraft.maxAmount,
@@ -205,27 +259,59 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
     ];
 
     if (requiredFields.some(value => String(value).trim() === '')) {
-      setRangeError('please complete all ranges fileds');
+      setRangeError('Please complete all range fields.');
       return;
     }
 
-    const nextRange = {
-      id: Date.now(),
-      minAmount: Math.max(Number(rangeDraft.minAmount) || 0, 0),
-      maxAmount: Math.max(Number(rangeDraft.maxAmount) || 0, 0),
-      rateType: rangeDraft.rateType,
-      rateValue: Math.max(Number(rangeDraft.rateValue) || 0, 0),
-      sortOrder: Math.max(Number(rangeDraft.sortOrder) || 0, 0),
-      status: rangeDraft.status,
-    };
+    setIsSavingRange(true);
+    try {
+      const payload = {
+        service: activeService,
+        minAmount: Math.max(Number(rangeDraft.minAmount) || 0, 0),
+        maxAmount: Math.max(Number(rangeDraft.maxAmount) || 0, 0),
+        rateType: rangeDraft.rateType,
+        rateValue: Math.max(Number(rangeDraft.rateValue) || 0, 0),
+        sortOrder: Math.max(Number(rangeDraft.sortOrder) || 0, 0),
+        status: rangeDraft.status,
+      };
+      const res = await apiFetch('/charges/ranges', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (res.success && res.range) {
+        // Directly add the saved range from API response into local state
+        setRangesByService(prev => ({
+          ...prev,
+          [activeService]: [...(prev[activeService] || []), res.range],
+        }));
+        setRangeDraft(DEFAULT_RANGE_FORM);
+        setRangeFormOpen(false);
+        setRangeError('');
+      } else {
+        setRangeError(res.message || 'Failed to save range.');
+      }
+    } catch (err) {
+      setRangeError('Network error saving range.');
+    } finally {
+      setIsSavingRange(false);
+    }
+  };
 
-    setRangesByService(prev => ({
-      ...prev,
-      [activeService]: [...(prev[activeService] || []), nextRange],
-    }));
-    setRangeDraft(DEFAULT_RANGE_FORM);
-    setRangeFormOpen(false);
-    setRangeError('');
+  const handleDeleteRange = async (rangeId) => {
+    try {
+      const res = await apiFetch(`/charges/ranges/${rangeId}`, { method: 'DELETE' });
+      if (res.success) {
+        // Directly remove the deleted range from local state
+        setRangesByService(prev => ({
+          ...prev,
+          [activeService]: (prev[activeService] || []).filter(r => r.id !== rangeId),
+        }));
+      } else {
+        setRangeError(res.message || 'Failed to delete range.');
+      }
+    } catch (err) {
+      setRangeError('Network error deleting range.');
+    }
   };
 
   return (
@@ -919,9 +1005,9 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
                 <h3 className="charges-panel-title">{content.profileTitle}</h3>
                 <p className="charges-panel-sub">{content.profileSub}</p>
               </div>
-              <button type="button" className="charges-btn" onClick={handleProfileAction}>
+              <button type="button" className="charges-btn" onClick={handleProfileAction} disabled={isSaving}>
                 {isFormLocked ? <Edit3 size={14} strokeWidth={2.5} /> : <Play size={14} fill="currentColor" strokeWidth={2.5} />}
-                {isFormLocked ? 'Edit Profile' : 'Save Profile'}
+                {isFormLocked ? 'Edit Profile' : isSaving ? 'Saving…' : 'Save Profile'}
               </button>
             </div>
 
@@ -1111,8 +1197,8 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
                   <button type="button" className="charges-range-cancel" onClick={handleCancelRange}>
                     Cancel
                   </button>
-                  <button type="button" className="charges-range-save" onClick={handleSaveRange}>
-                    Save Range
+                  <button type="button" className="charges-range-save" onClick={handleSaveRange} disabled={isSavingRange}>
+                    {isSavingRange ? 'Saving…' : 'Save Range'}
                   </button>
                 </div>
               </div>
@@ -1137,13 +1223,22 @@ export default function ChargesSettingPage({ usersCount = 3, onSaved }) {
                 ) : (
                   activeRanges.map((range) => (
                     <tr key={range.id}>
-                      <td>{formatINR(range.minAmount)}</td>
-                      <td>{formatINR(range.maxAmount)}</td>
-                      <td>{range.rateType}</td>
-                      <td>{range.rateType === 'Percentage' ? `${range.rateValue}%` : formatINR(range.rateValue)}</td>
-                      <td>{range.sortOrder}</td>
+                      <td>{formatINR(range.min_amount ?? range.minAmount)}</td>
+                      <td>{formatINR(range.max_amount ?? range.maxAmount)}</td>
+                      <td>{range.rate_type ?? range.rateType}</td>
+                      <td>{(range.rate_type ?? range.rateType) === 'Percentage' ? `${range.rate_value ?? range.rateValue}%` : formatINR(range.rate_value ?? range.rateValue)}</td>
+                      <td>{range.sort_order ?? range.sortOrder}</td>
                       <td><span className="charges-range-status">{range.status}</span></td>
-                      <td>-</td>
+                      <td>
+                        <button
+                          type="button"
+                          title="Delete range"
+                          onClick={() => handleDeleteRange(range.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: '4px' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}

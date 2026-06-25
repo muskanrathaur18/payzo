@@ -30,10 +30,11 @@ const translations = {
     logout: "Logout",
     language: "Language",
     home: "Home",
-    welcome: "Welcome, prahlad sir",
+    welcome: "Welcome",
     manageGateway: "Manage your payment gateway account",
     availableBalance: "Available Balance (After Charges)",
-    platformCharges: "% Platform charges: 10.00%",
+    platformCharges: `% Platform charges`,
+
     active: "Active",
     withdrawUsdt: "Withdraw USDT",
     totalDepositsCard: "Total deposits",
@@ -129,7 +130,8 @@ const translations = {
     welcome: "欢迎，普拉拉德 先生",
     manageGateway: "管理您的支付网关账户",
     availableBalance: "可用余额 (扣除手续费)",
-    platformCharges: "% 平台手续费: 10.00%",
+    platformCharges: `% 平台手续费`,
+
     active: "已启用",
     withdrawUsdt: "提现泰达币",
     totalDepositsCard: "充值总额",
@@ -229,18 +231,43 @@ export default function UserDashboard() {
     return translations[language]?.[key] || translations['English']?.[key] || key;
   };
 
-  // API Credentials values matching screenshot or session partner from admin dashboard
-  const sessionPartner = JSON.parse(localStorage.getItem('loggedInPartner')) || null;
-  const username = sessionPartner ? sessionPartner.username : "prahlad3311";
-  const merchantId = sessionPartner ? sessionPartner.merchantId : "m_1719602492dcebf73b";
-  const inputKey = sessionPartner ? `k_${merchantId}_secret_key_9983` : "k_1719602492dcebf73b_secret_key_67824";
-  const partnerDisplayName = sessionPartner ? sessionPartner.name : "prahlad sir";
+  // Session partner — reactively reads loggedInPartner from localStorage
+  const readPartner = () => {
+    try {
+      const stored = localStorage.getItem('loggedInPartner');
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) { return null; }
+  };
+
+  const [sessionPartner, setSessionPartner] = useState(readPartner);
+
+  // Re-read whenever localStorage changes (e.g. admin clicks "Login as" in another tab)
+  useEffect(() => {
+    const onStorage = () => setSessionPartner(readPartner());
+    window.addEventListener('storage', onStorage);
+    // Also re-read on focus (same-tab navigation)
+    window.addEventListener('focus', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onStorage);
+    };
+  }, []);
+
+  const username = sessionPartner?.username || "prahlad3311";
+  const merchantId = sessionPartner?.merchantId || "m_1719602492dcebf73b";
+  const inputKey = sessionPartner ? `k_${sessionPartner.merchantId}_secret_key_9983` : "k_1719602492dcebf73b_secret_key_67824";
+  const partnerDisplayName = sessionPartner?.name || "prahlad sir";
+  const partnerEmail = sessionPartner?.email || "prahlad@payzo.in";
+
 
   // State hooks
   const [showInputKey, setShowInputKey] = useState(false);
   const [apiSubTab, setApiSubTab] = useState('Auth');
   const [copiedField, setCopiedField] = useState('');
-  const [trc20Address, setTrc20Address] = useState(''); // Empty by default to show placeholder
+  const [trc20Address, setTrc20Address] = useState(() => {
+    // Load TRC20 address specific to this user
+    try { return localStorage.getItem(`payzo_trc20_${sessionPartner?.username || 'prahlad3311'}`) || ''; } catch { return ''; }
+  });
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   
@@ -250,26 +277,47 @@ export default function UserDashboard() {
   const [depositFilter, setDepositFilter] = useState('Success');
   const [isDepositFilterOpen, setIsDepositFilterOpen] = useState(false);
 
-  // Interactive Withdrawal & Balance states (Fetched from backend)
-  const [balance, setBalance] = useState(0.00);
-  const [transactionsList, setTransactionsList] = useState([]);
-  const [ipWhitelist, setIpWhitelist] = useState([]);
-  const [totalDeposits, setTotalDeposits] = useState(0);
+  // ── All 10 Dashboard Data States (from DB via /balance endpoint) ──────────
+  const [balance, setBalance] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`payzo_balance_${sessionPartner?.username || 'prahlad3311'}`);
+      if (stored !== null) return parseFloat(stored);
+    } catch {}
+    return parseFloat(sessionPartner?.walletBalance || 0);
+  });
+  const [holdBalance, setHoldBalance] = useState(0);
+  // Deposit metrics
+  const [totalDeposits, setTotalDeposits] = useState(0);      // = successfulDeposits
+  const [successfulDeposits, setSuccessfulDeposits] = useState(0);
+  const [platformFees, setPlatformFees] = useState(0);         // from DB
+  const [netReceived, setNetReceived] = useState(0);           // successfulDeposits - platformFees
+  const [platformFeePercent, setPlatformFeePercent] = useState(10); // from DB (display only for user)
+  // Payout metrics
   const [totalWithdrawn, setTotalWithdrawn] = useState(0);
+  const [gatewayPayouts, setGatewayPayouts] = useState(0);
+  const [pendingPayoutsCount, setPendingPayoutsCount] = useState(0);
+  // Transaction list
+  const [transactionsList, setTransactionsList] = useState([]);
+  const [ipWhitelist, setIpWhitelist] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`payzo_whitelist_${sessionPartner?.username || 'prahlad3311'}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
   const [backendStatus, setBackendStatus] = useState('ONLINE');
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawAddress, setWithdrawAddress] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Headers for backend calls
-  const CLIENT_ID = 'c_prahlad_merchant_9983';
-  const CLIENT_PASSWORD = 'client_password_789';
-  const headers = {
-    'x-client-id': CLIENT_ID,
-    'x-client-password': CLIENT_PASSWORD,
-    'Content-Type': 'application/json'
-  };
+  // Per-user API credentials
+  const CLIENT_ID = sessionPartner?.clientId || 'c_prahlad_merchant_9983';
+  const CLIENT_PASSWORD = sessionPartner?.clientPassword || 'client_password_789';
 
+  // Per-user localStorage key prefix
+  const userKey = `payzo_user_${username}`;
+
+  // ── fetchDashboardData: reads ALL 10 metrics from enhanced /balance endpoint
   const fetchDashboardData = async () => {
     try {
       const fetchHeaders = {
@@ -278,47 +326,73 @@ export default function UserDashboard() {
         'Content-Type': 'application/json'
       };
 
-      const balanceRes = await fetch('http://localhost:4000/api/v1/payment/balance', { headers: fetchHeaders });
+      // Fetch balance + all 10 aggregated stats in one call
+      const [balanceRes, txnsRes, wlRes] = await Promise.all([
+        fetch('http://localhost:4000/api/v1/payment/balance', { headers: fetchHeaders }),
+        fetch('http://localhost:4000/api/v1/payment/transactions', { headers: fetchHeaders }),
+        fetch('http://localhost:4000/api/v1/payment/whitelist', { headers: fetchHeaders })
+      ]);
+
       const balanceData = await balanceRes.json();
       if (balanceData.success) {
-        setBalance(parseFloat(balanceData.balance));
-        setTotalDeposits(parseFloat(balanceData.collections));
-        setTotalWithdrawn(parseFloat(balanceData.payouts));
+        // Core balance
+        const bal = parseFloat(balanceData.balance);
+        setBalance(bal);
+        setHoldBalance(parseFloat(balanceData.holdBalance || 0));
+        localStorage.setItem(`payzo_balance_${username}`, bal.toString());
+
+        // Deposit metrics (all from DB)
+        setSuccessfulDeposits(parseFloat(balanceData.successfulDeposits || 0));
+        setTotalDeposits(parseFloat(balanceData.successfulDeposits || 0)); // same as successfulDeposits
+        setPlatformFees(parseFloat(balanceData.platformFees || 0));
+        setNetReceived(parseFloat(balanceData.netReceived || 0));
+        setPlatformFeePercent(parseFloat(balanceData.platformFeePercent || 10));
+
+        // Payout metrics
+        setGatewayPayouts(parseFloat(balanceData.gatewayPayouts || 0));
+        setTotalWithdrawn(parseFloat(balanceData.totalWithdrawn || 0));
+        setPendingPayoutsCount(parseInt(balanceData.pendingPayoutsCount || 0));
+        if (balanceData.trc20Address) {
+          setTrc20Address(balanceData.trc20Address);
+        }
       }
 
-      const txnsRes = await fetch('http://localhost:4000/api/v1/payment/transactions', { headers: fetchHeaders });
       const txnsData = await txnsRes.json();
-      if (txnsData.success) {
-        setTransactionsList(txnsData.transactions);
-      }
+      if (txnsData.success) setTransactionsList(txnsData.transactions);
 
-      const wlRes = await fetch('http://localhost:4000/api/v1/payment/whitelist', { headers: fetchHeaders });
       const wlData = await wlRes.json();
       if (wlData.success) {
         setIpWhitelist(wlData.whitelist);
+        localStorage.setItem(`payzo_whitelist_${username}`, JSON.stringify(wlData.whitelist));
       }
+
+      setBackendStatus('ONLINE');
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setBackendStatus('OFFLINE');
     }
   };
 
+  // Auto-refresh every 30 seconds
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+    const interval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(interval);
+  }, [username]); // re-fetch when user changes
 
-  // Compute stats dynamically
+
+  // Compute stats from DB data
   const collectionTxns = transactionsList.filter(t => t.type === 'collection');
+  // platformFees, netReceived, successfulDeposits — all come from DB state now
 
-  const platformFees = totalDeposits * 0.10; // 10% platform fee
-  const netReceived = totalDeposits - platformFees;
-
+  const usdtRate = 90; // Could also be fetched from platform_settings
   const withdrawalsList = transactionsList.filter(t => t.type === 'payout').map(w => {
     const payload = typeof w.request_payload === 'string' ? JSON.parse(w.request_payload) : w.request_payload || {};
     return {
       id: `WID${w.id}`,
       amount: parseFloat(w.amount),
-      usdt: (parseFloat(w.amount) / 90).toFixed(2),
+      usdt: (parseFloat(w.amount) / usdtRate).toFixed(2),
       address: payload.trc20Address || payload.bankAccountNumber || payload.upiId || 'Dashboard Withdrawal',
       status: w.status === 'success' ? 'Success' : w.status === 'failed' ? 'Failed' : 'Pending',
       txHash: w.platform_order_code || 'Processing...',
@@ -327,7 +401,9 @@ export default function UserDashboard() {
     };
   });
 
-  const pendingWithdrawalsCount = withdrawalsList.filter(w => w.status === 'Pending').length;
+  // pendingWithdrawalsCount from DB (accurate)
+  const pendingWithdrawalsCount = pendingPayoutsCount;
+
 
   // Copy helper
   const handleCopy = (text, fieldName) => {
@@ -340,7 +416,7 @@ export default function UserDashboard() {
     navigate('/login');
   };
 
-  const handleSaveAddress = (e) => {
+  const handleSaveAddress = async (e) => {
     e.preventDefault();
     if (!/^T[a-zA-Z0-9]{33}$/.test(trc20Address)) {
       alert(
@@ -350,11 +426,33 @@ export default function UserDashboard() {
       );
       return;
     }
-    setAddressSaved(true);
-    setTimeout(() => setAddressSaved(false), 3000);
+    
+    try {
+      const response = await fetch('http://localhost:4000/api/v1/payment/settings/address', {
+        method: 'PATCH',
+        headers: {
+          'x-client-id': CLIENT_ID,
+          'x-client-password': CLIENT_PASSWORD,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ trc20Address })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        localStorage.setItem(`payzo_trc20_${username}`, trc20Address);
+        setAddressSaved(true);
+        setTimeout(() => setAddressSaved(false), 3000);
+      } else {
+        alert(data.message || 'Failed to save address to database.');
+      }
+    } catch (err) {
+      console.error('Error saving TRC20 address to database:', err);
+      alert('Network error saving address.');
+    }
   };
 
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     if (!oldPassword || !newPassword) return;
     if (newPassword.length < 6) {
@@ -373,10 +471,45 @@ export default function UserDashboard() {
       );
       return;
     }
-    setPasswordChanged(true);
-    setOldPassword('');
-    setNewPassword('');
-    setTimeout(() => setPasswordChanged(false), 3000);
+
+    try {
+      const response = await fetch('http://localhost:4000/api/v1/payment/settings/change-password', {
+        method: 'POST',
+        headers: {
+          'x-client-id': CLIENT_ID,
+          'x-client-password': CLIENT_PASSWORD,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ oldPassword, newPassword })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        // Update local credentials to keep session alive and in sync
+        const storedCreds = JSON.parse(localStorage.getItem('payzo_partner_creds') || '{}');
+        if (storedCreds[username]) {
+          storedCreds[username].password = newPassword;
+          localStorage.setItem('payzo_partner_creds', JSON.stringify(storedCreds));
+        }
+
+        // Update active session partner client password if it matches the changed password
+        if (sessionPartner) {
+          const updatedPartner = { ...sessionPartner, clientPassword: newPassword };
+          setSessionPartner(updatedPartner);
+          localStorage.setItem('loggedInPartner', JSON.stringify(updatedPartner));
+        }
+
+        setPasswordChanged(true);
+        setOldPassword('');
+        setNewPassword('');
+        setTimeout(() => setPasswordChanged(false), 3000);
+      } else {
+        alert(data.message || 'Failed to change password.');
+      }
+    } catch (err) {
+      console.error('Error changing password on database:', err);
+      alert('Network error changing password.');
+    }
   };
 
   const handleOpenWithdrawModal = () => {
@@ -390,15 +523,15 @@ export default function UserDashboard() {
     const amountNum = parseFloat(withdrawAmount);
     if (isNaN(amountNum) || amountNum <= 0) return;
     
-    const maxAllowed = Math.min(balance, totalDeposits);
-    if (amountNum > maxAllowed) {
+    if (amountNum > balance) {
       alert(
         language === '中文' 
-          ? `提现金额超出限制。您最高可提现：₹${maxAllowed.toFixed(2)}` 
-          : `Withdrawal amount exceeds allowed limit. Max payout: ₹${maxAllowed.toFixed(2)}`
+          ? `提现金额不能超过可用余额。您的余额：₹${balance.toFixed(2)}` 
+          : `Withdrawal amount cannot exceed available balance. Your balance: ₹${balance.toFixed(2)}`
       );
       return;
     }
+
 
     try {
       const payload = {
@@ -642,7 +775,7 @@ export default function UserDashboard() {
       </aside>
 
       {/* MAIN CONTENT REGION */}
-      <div className="flex-grow-1 d-flex flex-column min-vh-100 bg-light">
+      <div className="flex-grow-1 d-flex flex-column min-vh-100 bg-light" style={{ minWidth: 0 }}>
         
         {/* Top Header Navbar */}
         <header className="px-4 py-3 bg-primary text-white d-flex align-items-center justify-content-between shadow-sm" style={{ background: 'transparent' }}>
@@ -663,14 +796,22 @@ export default function UserDashboard() {
         </header>
 
         {/* Content Body */}
-        <main className="p-4 flex-grow-1 d-flex flex-column gap-4" style={{ backgroundColor: 'transparent' }}>
+        <main className="p-4 flex-grow-1 d-flex flex-column gap-4" style={{ backgroundColor: 'transparent', minWidth: 0, overflowX: 'hidden' }}>
+
           {activeTab === 'Dashboard' && (
             <>
           
           {/* Welcome Messages */}
           <div>
-            <h2 className="fw-bold text-dark mb-0 fs-3">{t('welcome')}</h2>
-            <p className="text-secondary fs-7 mb-0">{t('manageGateway')}</p>
+            <h2 className="fw-bold text-dark mb-0 fs-3">
+              Welcome, {partnerDisplayName} 👋
+            </h2>
+            <p className="text-secondary fs-7 mb-0">
+              {t('manageGateway')} &nbsp;
+              <span className="badge rounded-pill" style={{ backgroundColor: 'rgba(14,165,233,0.12)', color: '#0ea5e9', fontSize: '11px', fontWeight: 600 }}>
+                {username}
+              </span>
+            </p>
           </div>
 
           {/* Large Blue Available Balance Banner */}
@@ -678,7 +819,12 @@ export default function UserDashboard() {
             <div>
               <span className="text-white opacity-85 fs-7 d-block mb-1 font-medium">{t('availableBalance')}</span>
               <h1 className="fw-bold text-white mb-2 fs-1">₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h1>
-              <span className="text-white opacity-75 fs-8 d-block">{t('platformCharges')} <span className="badge rounded-pill px-2.5 py-1 ms-2 fs-9" style={{ backgroundColor: 'rgba(52, 211, 153, 0.2)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.3)' }}>{t('active')}</span></span>
+              <span className="text-white opacity-75 fs-8 d-block">
+                {t('platformCharges')}: <strong>{platformFeePercent.toFixed(2)}%</strong>
+                <span className="badge rounded-pill px-2 py-1 ms-2 fs-9" style={{ backgroundColor: 'rgba(52, 211, 153, 0.2)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.3)' }}>{t('active')}</span>
+                {lastUpdated && <span className="ms-2 opacity-60" style={{fontSize:'10px'}}>Updated {lastUpdated.toLocaleTimeString()}</span>}
+              </span>
+
             </div>
             <button 
               onClick={handleOpenWithdrawModal}
@@ -716,7 +862,7 @@ export default function UserDashboard() {
                   </div>
                   <div>
                     <span className="text-secondary fs-8 d-block uppercase tracking-wider font-semibold">{t('gatewayPayouts')}</span>
-                    <h4 className="fw-bold text-dark mb-0 mt-0.5">₹{totalWithdrawn.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>
+                    <h4 className="fw-bold text-dark mb-0 mt-0.5">₹{gatewayPayouts.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>
                   </div>
                 </div>
               </div>
@@ -1108,7 +1254,8 @@ export default function UserDashboard() {
                       </div>
                       <div>
                         <span className="text-secondary fs-8 d-block font-semibold mb-0.5">{t('successfulDeposits')}</span>
-                        <h4 className="fw-bold text-dark mb-0 fs-4">₹{totalDeposits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>
+                        <h4 className="fw-bold text-dark mb-0 fs-4">₹{successfulDeposits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>
+
                       </div>
                     </div>
                   </div>
@@ -1246,8 +1393,8 @@ export default function UserDashboard() {
                           const payload = typeof txn.request_payload === 'string' ? JSON.parse(txn.request_payload) : txn.request_payload || {};
                           return (
                             <tr key={txn.id} className="border-bottom border-light-subtle">
-                              <td className="py-3 px-4 font-monospace fs-8 fw-semibold text-dark">{txn.order_code}</td>
-                              <td className="py-3 px-3 font-monospace fs-8 text-secondary">{txn.platform_order_code || '-'}</td>
+                              <td className="py-3 px-4 font-monospace fs-8 fw-semibold text-dark" style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={txn.order_code}>{txn.order_code}</td>
+                              <td className="py-3 px-3 font-monospace fs-8 text-secondary" style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={txn.platform_order_code}>{txn.platform_order_code || '-'}</td>
                               <td className="py-3 px-3">
                                 <span className={`badge py-1 px-2.5 fs-9 rounded ${
                                   txn.status === 'success' ? 'bg-success bg-opacity-10 text-success' :
@@ -1260,7 +1407,7 @@ export default function UserDashboard() {
                               <td className="py-3 px-3 fw-semibold text-dark">₹{amount.toFixed(2)}</td>
                               <td className="py-3 px-3 text-secondary">₹{net.toFixed(2)}</td>
                               <td className="py-3 px-3 text-secondary">₹{fee.toFixed(2)}</td>
-                              <td className="py-3 px-3 text-dark">{payload.name || 'Customer'}</td>
+                              <td className="py-3 px-3 text-dark" style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={payload.name || 'Customer'}>{payload.name || 'Customer'}</td>
                               <td className="py-3 px-4 text-secondary fs-8">{new Date(txn.created_at).toLocaleString()}</td>
                             </tr>
                           );
@@ -1366,7 +1513,7 @@ export default function UserDashboard() {
                             <td className="py-3 px-3 fw-medium text-dark">{w.id.replace('WID', language === '中文' ? '提现' : 'WID')}</td>
                             <td className="py-3 px-3 text-dark">₹{parseFloat(w.amount).toFixed(2)}</td>
                             <td className="py-3 px-3 text-teal fw-semibold">{w.usdt} {language === '中文' ? '泰达币' : 'USDT'}</td>
-                            <td className="py-3 px-3 text-secondary font-monospace fs-8">{w.address === 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb' ? (language === '中文' ? '默认波场提现地址' : 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb') : w.address}</td>
+                            <td className="py-3 px-3 text-secondary font-monospace fs-8" style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={w.address}>{w.address === 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb' ? (language === '中文' ? '默认波场提现地址' : 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb') : w.address}</td>
                             <td className="py-3 px-3">
                               <span className={`badge rounded-pill px-2.5 py-1 fs-9 ${
                                 w.status === 'Pending' ? 'bg-warning bg-opacity-10 text-warning' : 
@@ -1376,8 +1523,8 @@ export default function UserDashboard() {
                                 {w.status === 'Pending' ? t('pending') : w.status === 'Success' ? t('success') : t('failed')}
                               </span>
                             </td>
-                            <td className="py-3 px-3 text-secondary font-monospace fs-8">{w.txHash === 'Processing...' ? t('processing') : w.txHash}</td>
-                            <td className="py-3 px-3 text-secondary fs-8">{(w.adminNote === '等待管理员审核' || w.adminNote === 'Awaiting administrator approval') ? t('awaitingAdminApproval') : w.adminNote}</td>
+                            <td className="py-3 px-3 text-secondary font-monospace fs-8" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={w.txHash}>{w.txHash === 'Processing...' ? t('processing') : w.txHash}</td>
+                            <td className="py-3 px-3 text-secondary fs-8" style={{ maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={w.adminNote}>{(w.adminNote === '等待管理员审核' || w.adminNote === 'Awaiting administrator approval') ? t('awaitingAdminApproval') : w.adminNote}</td>
                             <td className="py-3 px-3 text-secondary fs-8 text-nowrap">{w.date}</td>
                           </tr>
                         ))
@@ -1941,8 +2088,8 @@ export default function UserDashboard() {
                                   )}
                                 </span>
                               </td>
-                              <td className="py-3 px-3 font-monospace fs-8 text-dark fw-semibold">{t.order_code}</td>
-                              <td className="py-3 px-3 font-monospace fs-8 text-secondary">{t.platform_order_code || '-'}</td>
+                              <td className="py-3 px-3 font-monospace fs-8 text-dark fw-semibold" style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.order_code}>{t.order_code}</td>
+                              <td className="py-3 px-3 font-monospace fs-8 text-secondary" style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.platform_order_code}>{t.platform_order_code || '-'}</td>
                               <td className={`py-3 px-3 fw-bold ${isCollection ? 'text-success' : 'text-dark'}`}>
                                 {isCollection ? '+' : '-'}₹{amount.toFixed(2)}
                               </td>
@@ -2007,8 +2154,6 @@ export default function UserDashboard() {
                     placeholder={language === '中文' ? '输入 INR 金额' : 'Enter amount in INR'}
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
-                    min="100"
-                    max={Math.min(balance, totalDeposits)}
                     style={{
                       backgroundColor: '#ffffff',
                       border: '1px solid #cbd5e1',
@@ -2023,12 +2168,8 @@ export default function UserDashboard() {
                   </span>
                 </div>
                 <div className="d-flex flex-column gap-1 mt-2 fs-8 text-secondary">
-                  <div className="d-flex justify-content-between">
-                    <span>{language === '中文' ? '可用余额' : 'Available Wallet Balance'}: ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    <span>{language === '中文' ? '总充值限额' : 'Total Pay-ins Limit'}: ₹{totalDeposits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
                   <div className="d-flex justify-content-between align-items-center">
-                    <span className="text-danger fw-semibold">{language === '中文' ? '最高可提现金额' : 'Max Allowed Payout'}: ₹{Math.min(balance, totalDeposits).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>{language === '中文' ? '可用余额' : 'Available Wallet Balance'}: ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     {withdrawAmount > 0 && (
                       <span className="text-success fw-medium">
                         ≈ {(withdrawAmount / 90).toFixed(2)} {language === '中文' ? '泰达币' : 'USDT'}

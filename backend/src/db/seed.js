@@ -21,11 +21,12 @@ async function seed() {
     const rawPassword = 'client_password_789';
     const xClientId = 'c_prahlad_merchant_9983'; // Custom clean ID or standard UUID
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const hashedLoginPassword = await bcrypt.hash('PayzoPass789', 10);
 
     const clientRes = await query(
-      `INSERT INTO clients (client_name, x_client_id, x_client_password) 
-       VALUES ($1, $2, $3) RETURNING id, client_name, x_client_id`,
-      [clientName, xClientId, hashedPassword]
+      `INSERT INTO clients (client_name, x_client_id, x_client_password, x_client_password_clear, login_username, login_password) 
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, client_name, x_client_id`,
+      [clientName, xClientId, hashedPassword, rawPassword, 'prahlad3311', hashedLoginPassword]
     );
 
     const newClient = clientRes.rows[0];

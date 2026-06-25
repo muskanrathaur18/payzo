@@ -18,6 +18,11 @@ export async function ipWhitelist(req, res, next) {
     clientIp = clientIp.substring(7);
   }
 
+  // Bypass IP whitelist check for local loopback addresses (local development/testing)
+  if (clientIp === '127.0.0.1') {
+    return next();
+  }
+
   try {
     // Check if client has any whitelisted IPs
     const result = await query(

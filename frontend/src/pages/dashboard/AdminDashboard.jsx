@@ -151,8 +151,12 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('Overview');
   const [language, setLanguage] = useState('English');
 
+  const t = (key) => {
+    return translations[language]?.[key] || translations['English']?.[key] || key;
+  };
+
   // API Partners state with mock data matching screenshots
-  const [apiPartners, setApiPartners] = useState([
+  const defaultPartners = [
     {
       id: 4,
       name: "viral",
@@ -210,7 +214,15 @@ export default function AdminDashboard() {
       country: "India",
       settlementType: "Not set"
     }
-  ]);
+  ];
+
+  const [apiPartners, setApiPartners] = useState(() => {
+    try {
+      const stored = localStorage.getItem('payzo_api_partners');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return defaultPartners;
+  });
 
   const [partnerSubTab, setPartnerSubTab] = useState('list'); // 'list', 'create', 'edit'
   const [editingPartner, setEditingPartner] = useState(null);
@@ -221,6 +233,7 @@ export default function AdminDashboard() {
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formMobile, setFormMobile] = useState('');
+  const [formUsername, setFormUsername] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [chargesName, setChargesName] = useState('');
   const [showFormPassword, setShowFormPassword] = useState(false);
@@ -243,17 +256,99 @@ export default function AdminDashboard() {
   const [walletIfsc, setWalletIfsc] = useState('');
   const [walletRemark, setWalletRemark] = useState('');
 
-  const t = (key) => {
-    return translations[language]?.[key] || translations['English']?.[key] || key;
-  };
-
   // Admin interactive state variables
   const [feeRate, setFeeRate] = useState(10.00);
   const [minDepositText, setMinDepositText] = useState("Minimum deposit ₹200.00, use only your Merchant id and input key for API signing.");
   const [isConfigSaved, setIsConfigSaved] = useState(false);
-  
+  // Platform fee — admin-managed via DB
+  const [dbFeePercent, setDbFeePercent] = useState('10.00');
+  const [feeUpdateLoading, setFeeUpdateLoading] = useState(false);
+  const [feeUpdateMsg, setFeeUpdateMsg] = useState('');
+  const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY || 'payzo_admin_secret_key_9983';
+
+  const fetchPartnersFromDb = async () => {
+    try {
+      const res = await fetch('http://localhost:4000/api/v1/admin/clients', {
+        headers: { 'x-admin-key': ADMIN_KEY }
+      });
+      const data = await res.json();
+      if (data.success && data.clients) {
+        const mapped = data.clients.map(c => ({
+          id: c.id,
+          name: c.client_name,
+          username: c.login_username,
+          email: c.email || '',
+          mobile: c.mobile || '',
+          clientOutletId: c.client_outlet_id,
+          activeServices: c.active_services || ['pay in', 'pay out'],
+          walletBalance: parseFloat(c.wallet_balance || 0),
+          holdBalance: parseFloat(c.hold_balance || 0),
+          status: c.is_active ? 'Active' : 'Inactive',
+          gender: c.gender || 'Male',
+          dob: c.dob || '',
+          city: c.city || '',
+          state: c.state || '',
+          xClientId: c.x_client_id
+        }));
+        setApiPartners(mapped);
+        localStorage.setItem('payzo_api_partners', JSON.stringify(mapped));
+      }
+    } catch (err) {
+      console.error('Error fetching clients from DB:', err);
+    }
+  };
+
+  // Fetch current platform fee from DB on load
+  useEffect(() => {
+    fetch('http://localhost:4000/api/v1/admin/settings', { headers: { 'x-admin-key': ADMIN_KEY } })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.settings?.platform_fee_percent) {
+          const fee = data.settings.platform_fee_percent.value;
+          setDbFeePercent(String(fee));
+          setFeeRate(parseFloat(fee));
+        }
+      })
+      .catch(() => {});
+
+    fetchPartnersFromDb();
+  }, []);
+
+  const handleSavePlatformFee = async (e) => {
+    e.preventDefault();
+    const num = parseFloat(dbFeePercent);
+    if (isNaN(num) || num < 0 || num > 100) {
+      setFeeUpdateMsg('❌ Invalid: Enter a number between 0 and 100.');
+      setTimeout(() => setFeeUpdateMsg(''), 3000);
+      return;
+    }
+    setFeeUpdateLoading(true);
+    try {
+      const res = await fetch('http://localhost:4000/api/v1/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+        body: JSON.stringify({ key: 'platform_fee_percent', value: num.toFixed(2), updatedBy: 'admin' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeeRate(num);
+        setFeeUpdateMsg(`✅ Platform fee updated to ${num.toFixed(2)}% — applies to all future transactions.`);
+        setToastMessage(`Platform fee changed to ${num.toFixed(2)}%`);
+        setTimeout(() => setToastMessage(''), 3000);
+      } else {
+        setFeeUpdateMsg('❌ Failed: ' + data.message);
+      }
+    } catch (err) {
+      setFeeUpdateMsg('❌ Backend unreachable. Fee not saved.');
+    } finally {
+      setFeeUpdateLoading(false);
+      setTimeout(() => setFeeUpdateMsg(''), 6000);
+    }
+  };
+
   // Success toast message
   const [toastMessage, setToastMessage] = useState('');
+
 
   // Merchants list state (Reverted to local static mock data)
   const [merchants, setMerchants] = useState([
@@ -340,6 +435,7 @@ export default function AdminDashboard() {
   const [editingApiName, setEditingApiName] = useState('');
   const [editingApiDesc, setEditingApiDesc] = useState('');
   const [isSpinning, setIsSpinning] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState(null); // { loginUsername, loginPassword, xClientId, xClientPassword }
   const [showAddApi, setShowAddApi] = useState(false);
   const [newApiName, setNewApiName] = useState('');
   const [newApiDesc, setNewApiDesc] = useState('');
@@ -409,6 +505,7 @@ export default function AdminDashboard() {
     setFormName('');
     setFormEmail('');
     setFormMobile('');
+    setFormUsername('');
     setFormPassword('');
     setShowFormPassword(false);
     setFormGender('Male');
@@ -429,6 +526,7 @@ export default function AdminDashboard() {
     setFormName(partner.name || '');
     setFormEmail(partner.email || '');
     setFormMobile(partner.mobile || '');
+    setFormUsername(partner.username || '');
     setFormPassword('');
     setShowFormPassword(false);
     setFormGender(partner.gender || 'Male');
@@ -444,41 +542,57 @@ export default function AdminDashboard() {
     setPartnerSubTab('edit');
   };
 
-  // Save/Create Partner form submission
-  const handleSavePartner = (e) => {
+  // Save/Create Partner - calls backend API to store in DB
+  const handleSavePartner = async (e) => {
     e.preventDefault();
+    const ADMIN_KEY = 'payzo_admin_secret_key_9983';
     if (partnerSubTab === 'create') {
       const newId = Math.max(...apiPartners.map(p => p.id), 0) + 1;
-      const newPartner = {
-        id: newId,
-        name: formName,
-        email: formEmail,
-        mobile: formMobile,
-        clientOutletId: formClientOutletId,
-        activeServices: ["pay in", "pay out"],
-        walletBalance: 0.00,
-        holdBalance: 0.00,
-        status: "Active",
-        gender: formGender,
-        dob: formDob,
-        city: formCity,
-        district: formDistrict,
-        pincode: formPincode,
-        state: formState,
-        country: formCountry,
-        settlementType: formSettlementType
-      };
-      setApiPartners([newPartner, ...apiPartners]);
-      setToastMessage('API Partner created successfully');
+      const partnerUsername = formUsername.trim() || (formName.toLowerCase().replace(/\s+/g, '_') + newId);
+      const apiPassword = 'api_' + Date.now();
+      try {
+        const res = await fetch('http://localhost:4000/api/v1/admin/clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+          body: JSON.stringify({
+            clientName: formName, clientPassword: apiPassword,
+            email: formEmail, mobile: formMobile,
+            loginUsername: partnerUsername, loginPassword: formPassword || 'Partner@123',
+            gender: formGender, dob: formDob, city: formCity, district: formDistrict,
+            pincode: formPincode, state: formState, country: formCountry,
+            settlementType: formSettlementType, clientOutletId: formClientOutletId
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setToastMessage('Partner created and saved to database!');
+          fetchPartnersFromDb();
+        } else { alert('Error: ' + (data.message || 'Failed.')); return; }
+      } catch (err) {
+        const storedCreds = JSON.parse(localStorage.getItem('payzo_partner_creds') || '{}');
+        storedCreds[partnerUsername] = { password: formPassword || 'Partner@123', partnerId: newId, name: formName };
+        localStorage.setItem('payzo_partner_creds', JSON.stringify(storedCreds));
+        const newPartner = { id: newId, name: formName, username: partnerUsername, email: formEmail, mobile: formMobile,
+          clientOutletId: formClientOutletId || ('m_outlet_' + newId), activeServices: ['pay in','pay out'],
+          walletBalance: 0, holdBalance: 0, status: 'Active', gender: formGender, dob: formDob,
+          city: formCity, district: formDistrict, pincode: formPincode, state: formState, country: formCountry, settlementType: formSettlementType };
+        const updatedPartners = [newPartner, ...apiPartners];
+        setApiPartners(updatedPartners);
+        localStorage.setItem('payzo_api_partners', JSON.stringify(updatedPartners));
+        setCreatedCredentials({ name: formName, loginUsername: partnerUsername, loginPassword: formPassword || 'Partner@123', xClientId: 'N/A', xClientPassword: 'N/A', clientOutletId: formClientOutletId || 'm_outlet_' + newId });
+        setToastMessage('Partner saved locally (backend offline).');
+      }
     } else if (partnerSubTab === 'edit' && editingPartner) {
-      setApiPartners(prev => prev.map(p => {
-        if (p.id === editingPartner.id) {
-          return {
-            ...p,
-            name: formName,
+      try {
+        const res = await fetch(`http://localhost:4000/api/v1/admin/clients/${editingPartner.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+          body: JSON.stringify({
+            clientName: formName,
             email: formEmail,
             mobile: formMobile,
-            clientOutletId: formClientOutletId,
+            loginUsername: formUsername.trim(),
+            loginPassword: formPassword || undefined,
             gender: formGender,
             dob: formDob,
             city: formCity,
@@ -486,28 +600,68 @@ export default function AdminDashboard() {
             pincode: formPincode,
             state: formState,
             country: formCountry,
-            settlementType: formSettlementType
-          };
+            settlementType: formSettlementType,
+            clientOutletId: formClientOutletId
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setToastMessage('API Partner updated in database successfully!');
+          fetchPartnersFromDb();
+        } else {
+          alert('Error: ' + (data.message || 'Failed.'));
+          return;
         }
-        return p;
-      }));
-      setToastMessage('API Partner updated successfully');
+      } catch (err) {
+        console.error('Error updating partner on database:', err);
+        const updatedPartners = apiPartners.map(p => {
+          if (p.id === editingPartner.id) {
+            return { ...p, name: formName, email: formEmail, mobile: formMobile, clientOutletId: formClientOutletId,
+              username: formUsername.trim() || p.username,
+              gender: formGender, dob: formDob, city: formCity, district: formDistrict,
+              pincode: formPincode, state: formState, country: formCountry, settlementType: formSettlementType };
+          }
+          return p;
+        });
+        setApiPartners(updatedPartners);
+        localStorage.setItem('payzo_api_partners', JSON.stringify(updatedPartners));
+        setToastMessage('API Partner updated locally (backend offline).');
+      }
     }
-    setTimeout(() => setToastMessage(''), 3000);
+    setTimeout(() => setToastMessage(''), 5000);
     setPartnerSubTab('list');
   };
 
   // Toggle API Partner Active/Inactive status
-  const handleTogglePartnerStatus = (id) => {
-    setApiPartners(prev => prev.map(p => {
-      if (p.id === id) {
-        const nextStatus = p.status === 'Active' ? 'Inactive' : 'Active';
-        setToastMessage(`API Partner status updated to ${nextStatus}`);
-        setTimeout(() => setToastMessage(''), 3000);
-        return { ...p, status: nextStatus };
+  const handleTogglePartnerStatus = async (id) => {
+    const partner = apiPartners.find(p => p.id === id);
+    if (!partner) return;
+    const newIsActive = partner.status !== 'Active';
+    try {
+      const res = await fetch(`http://localhost:4000/api/v1/admin/clients/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+        body: JSON.stringify({ isActive: newIsActive })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(`API Partner status updated to ${newIsActive ? 'Active' : 'Inactive'}`);
+        fetchPartnersFromDb();
+      } else {
+        alert('Error updating status: ' + (data.message || 'Failed.'));
       }
-      return p;
-    }));
+    } catch (err) {
+      console.error('Error toggling status on DB:', err);
+      setApiPartners(prev => prev.map(p => {
+        if (p.id === id) {
+          const nextStatus = p.status === 'Active' ? 'Inactive' : 'Active';
+          return { ...p, status: nextStatus };
+        }
+        return p;
+      }));
+      setToastMessage('API Partner status updated locally.');
+    }
+    setTimeout(() => setToastMessage(''), 3000);
   };
 
   // Toggle specific services from dropdown checkboxes
@@ -525,7 +679,7 @@ export default function AdminDashboard() {
   };
 
   // Submit wallet adjustment credit/debit
-  const handleWalletAdjustmentSubmit = (e) => {
+  const handleWalletAdjustmentSubmit = async (e) => {
     e.preventDefault();
     if (!selectedPartnerForWallet) return;
     const amountNum = parseFloat(walletAmount || '0');
@@ -534,24 +688,44 @@ export default function AdminDashboard() {
       return;
     }
 
-    setApiPartners(prev => prev.map(p => {
-      if (p.id === selectedPartnerForWallet.id) {
-        if (walletAdjustmentType === 'Main Wallet') {
-          const updatedBalance = walletAdjustmentAction === 'Credit'
-            ? p.walletBalance + amountNum
-            : Math.max(0, p.walletBalance - amountNum);
-          return { ...p, walletBalance: updatedBalance };
-        } else {
-          const updatedHold = walletAdjustmentAction === 'Credit'
-            ? p.holdBalance + amountNum
-            : Math.max(0, p.holdBalance - amountNum);
-          return { ...p, holdBalance: updatedHold };
-        }
+    try {
+      const res = await fetch(`http://localhost:4000/api/v1/admin/clients/${selectedPartnerForWallet.id}/wallet`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+        body: JSON.stringify({
+          action: walletAdjustmentAction,
+          walletType: walletAdjustmentType,
+          amount: amountNum
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(`Wallet successfully ${walletAdjustmentAction === 'Credit' ? 'credited' : 'debited'} with ₹${amountNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+        fetchPartnersFromDb();
+      } else {
+        alert('Error adjusting wallet: ' + (data.message || 'Failed.'));
       }
-      return p;
-    }));
+    } catch (err) {
+      console.error('Error adjusting wallet on DB:', err);
+      setApiPartners(prev => prev.map(p => {
+        if (p.id === selectedPartnerForWallet.id) {
+          if (walletAdjustmentType === 'Main Wallet') {
+            const updatedBalance = walletAdjustmentAction === 'Credit'
+              ? p.walletBalance + amountNum
+              : Math.max(0, p.walletBalance - amountNum);
+            return { ...p, walletBalance: updatedBalance };
+          } else {
+            const updatedHold = walletAdjustmentAction === 'Credit'
+              ? p.holdBalance + amountNum
+              : Math.max(0, p.holdBalance - amountNum);
+            return { ...p, holdBalance: updatedHold };
+          }
+        }
+        return p;
+      }));
+      setToastMessage(`Wallet successfully ${walletAdjustmentAction === 'Credit' ? 'credited' : 'debited'} locally.`);
+    }
 
-    setToastMessage(`Wallet successfully ${walletAdjustmentAction === 'Credit' ? 'credited' : 'debited'} with ₹${amountNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
     setTimeout(() => setToastMessage(''), 3000);
     setSelectedPartnerForWallet(null);
     setWalletAmount('');
@@ -562,13 +736,22 @@ export default function AdminDashboard() {
 
   // Redirection for Login As
   const handleLoginAsPartner = (partner) => {
-    localStorage.setItem('loggedInPartner', JSON.stringify({
-      username: partner.name + partner.id,
-      merchantId: partner.clientOutletId || "m_outlet_" + partner.id,
+    const partnerUsername = partner.username || (partner.name.toLowerCase().replace(/\s+/g, '_') + partner.id);
+    const partnerData = {
+      username: partnerUsername,
+      merchantId: partner.clientOutletId || ('m_outlet_' + partner.id),
       name: partner.name,
-      email: partner.email
-    }));
-    setToastMessage(`Logging in as ${partner.name}...`);
+      email: partner.email,
+      mobile: partner.mobile,
+      city: partner.city,
+      state: partner.state,
+      walletBalance: partner.walletBalance,
+      holdBalance: partner.holdBalance,
+      activeServices: partner.activeServices
+    };
+    localStorage.setItem('loggedInPartner', JSON.stringify(partnerData));
+    localStorage.setItem('payzo_balance_' + partnerUsername, (partner.walletBalance || 0).toString());
+    setToastMessage('Logging in as ' + partner.name + '...');
     setTimeout(() => {
       setToastMessage('');
       window.open('/userdashboard', '_blank');
@@ -866,7 +1049,7 @@ export default function AdminDashboard() {
       </aside>
 
       {/* MAIN CONTENT REGION */}
-      <div className="flex-grow-1 d-flex flex-column min-vh-100" style={{ background: 'transparent' }}>
+      <div className="flex-grow-1 d-flex flex-column min-vh-100" style={{ background: 'transparent', minWidth: 0 }}>
         
         {/* Top Header Navbar */}
         <header className="px-4 py-3 border-bottom d-flex align-items-center justify-content-between shadow-sm" style={{ background: '#090d16', borderColor: 'rgba(255,255,255,0.03)' }}>
@@ -901,7 +1084,8 @@ export default function AdminDashboard() {
         )}
 
         {/* Content Body */}
-        <main className="p-4 flex-grow-1 d-flex flex-column gap-4" style={{ zIndex: 2 }}>
+        <main className="p-4 flex-grow-1 d-flex flex-column gap-4" style={{ zIndex: 2, minWidth: 0, overflowX: 'hidden' }}>
+
           
           {/* Welcome Message */}
           <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -1580,6 +1764,7 @@ export default function AdminDashboard() {
 
           {activeTab === 'Settings' && (() => {
             const acSettingTabs = [
+              { id: 'platform_fee',  label: '💰 Platform Fee (Admin)' },
               { id: 'personal',      label: 'Personal Detail' },
               { id: 'billing',       label: 'Billing Address' },
               { id: 'apis',          label: 'Active APIs' },
@@ -1587,6 +1772,7 @@ export default function AdminDashboard() {
               { id: 'password',      label: 'Change Password' },
               { id: 'mobile',        label: 'Change Mobile No' },
             ];
+
             return (
               <div className="d-flex flex-column gap-0">
                 <style>{`
@@ -1898,7 +2084,85 @@ export default function AdminDashboard() {
                   ))}
                 </div>
 
-                {/* â”€â”€ Personal Detail â”€â”€ */}
+                {/* ── PLATFORM FEE (Admin Only) ── */}
+                {settingSubTab === 'platform_fee' && (
+                  <div className="ac-card" style={{ maxWidth: '580px' }}>
+                    <div className="d-flex align-items-center gap-2 mb-4">
+                      <span style={{ fontSize: '28px' }}>💰</span>
+                      <div>
+                        <h3 className="ac-card-title mb-0" style={{ textAlign: 'left', fontSize: '18px' }}>Platform Fee Management</h3>
+                        <p style={{ color: '#64748b', fontSize: '12px', margin: 0 }}>Admin-only control. Users cannot view or modify this setting.</p>
+                      </div>
+                    </div>
+                    {/* Current fee badge */}
+                    <div className="mb-4 p-3 rounded-3 d-flex align-items-center justify-content-between"
+                      style={{ background: 'rgba(14,165,233,0.07)', border: '1px solid rgba(14,165,233,0.15)' }}>
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>CURRENT LIVE FEE</span>
+                        <div style={{ fontSize: '32px', fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace', lineHeight: 1.1 }}>
+                          {feeRate.toFixed(2)}%
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Applied to every</span><br />
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>successful collection</span>
+                      </div>
+                    </div>
+                    {/* Update form */}
+                    <form onSubmit={handleSavePlatformFee}>
+                      <div className="ac-field-wrap">
+                        <label className="ac-field-label">
+                          New Platform Fee (%)
+                          <span style={{ fontSize: '10px', color: '#475569', fontWeight: 400 }}>0 – 100</span>
+                        </label>
+                        <input
+                          className="ac-input"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={dbFeePercent}
+                          onChange={e => setDbFeePercent(e.target.value)}
+                          placeholder="e.g. 10.00"
+                          required
+                        />
+                        <p className="ac-helper-text">
+                          ⚠️ This change applies immediately to ALL future transactions across ALL partners.
+                          Existing transactions are not affected.
+                        </p>
+                      </div>
+                      <button
+                        type="submit"
+                        className="ac-save-btn"
+                        disabled={feeUpdateLoading}
+                        style={{ opacity: feeUpdateLoading ? 0.7 : 1 }}
+                      >
+                        {feeUpdateLoading ? '⏳ Saving to Database...' : '💾 Save Platform Fee to Database'}
+                      </button>
+                      {feeUpdateMsg && (
+                        <div className="mt-3 p-3 rounded-3" style={{
+                          background: feeUpdateMsg.startsWith('✅') ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                          border: `1px solid ${feeUpdateMsg.startsWith('✅') ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                          color: feeUpdateMsg.startsWith('✅') ? '#10b981' : '#fca5a5',
+                          fontSize: '13px', fontWeight: 600
+                        }}>
+                          {feeUpdateMsg}
+                        </div>
+                      )}
+                    </form>
+                    {/* Security notice */}
+                    <div className="mt-4 p-3 rounded-3" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)' }}>
+                      <span style={{ fontSize: '11px', color: '#fbbf24', fontWeight: 700 }}>🔒 ADMIN-ONLY ACCESS</span>
+                      <p style={{ fontSize: '11.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                        Platform fee settings are strictly restricted to administrators.
+                        Partner dashboard users have no access to view or modify these controls.
+                        Fee changes are recorded in the database with timestamp and admin identity.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Personal Detail ── */}
                 {settingSubTab === 'personal' && (
                   <div className="ac-card">
                     <h3 className="ac-card-title">Account Setting</h3>
@@ -2497,6 +2761,7 @@ export default function AdminDashboard() {
                       <button 
                         onClick={() => {
                           setPartnerSearchQuery('');
+                          fetchPartnersFromDb();
                           setToastMessage('Data refreshed');
                           setTimeout(() => setToastMessage(''), 2000);
                         }} 

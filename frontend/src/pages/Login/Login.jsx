@@ -16,20 +16,72 @@ export default function Login() {
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin3311';
   const adminPassword = localStorage.getItem('admin_password') || import.meta.env.VITE_ADMIN_PASSWORD || 'AdminPass789';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const enteredUsername = username.trim();
-    
-    if (enteredUsername === userEmail && password === userPassword) {
+
+    // 1. Check hardcoded admin credentials
+    if (enteredUsername === adminEmail && password === adminPassword) {
       setError('');
-      alert('Login successful!');
-      navigate('/userdashboard');
-    } else if (enteredUsername === adminEmail && password === adminPassword) {
-      setError('');
-      alert('Admin Login successful!');
+      localStorage.removeItem('loggedInPartner');
       navigate('/admindashboard');
-    } else {
-      setError('Invalid username or password. Please try again.');
+      return;
+    }
+
+    // 2. Call backend login API for database-driven partner verification
+    try {
+      const response = await fetch('http://localhost:4000/api/v1/payment/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: enteredUsername,
+          password: password
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        // Save partner profile directly returned from database
+        localStorage.setItem('loggedInPartner', JSON.stringify(data.partner));
+        setError('');
+        navigate('/userdashboard');
+        return;
+      } else {
+        setError(data.message || 'Invalid username or password.');
+        return;
+      }
+    } catch (err) {
+      console.error('Error checking partner credentials on DB:', err);
+      // Fallback to local storage credentials for offline robustness
+      try {
+        const storedCreds = JSON.parse(localStorage.getItem('payzo_partner_creds') || '{}');
+        const storedPartners = JSON.parse(localStorage.getItem('payzo_api_partners') || '[]');
+
+        if (storedCreds[enteredUsername] && storedCreds[enteredUsername].password === password) {
+          const credInfo = storedCreds[enteredUsername];
+          const fullPartner = storedPartners.find(p => p.id === credInfo.partnerId) || {};
+          localStorage.setItem('loggedInPartner', JSON.stringify({
+            username: enteredUsername,
+            merchantId: fullPartner.clientOutletId || ('m_outlet_' + credInfo.partnerId),
+            name: fullPartner.name || credInfo.name,
+            email: fullPartner.email || enteredUsername,
+            mobile: fullPartner.mobile || '',
+            city: fullPartner.city || '',
+            state: fullPartner.state || '',
+            walletBalance: fullPartner.walletBalance || 0,
+            holdBalance: fullPartner.holdBalance || 0,
+            activeServices: fullPartner.activeServices || ['pay in', 'pay out']
+          }));
+          setError('');
+          navigate('/userdashboard');
+          return;
+        }
+      } catch (e) {
+        console.error('Local fallback login error:', e);
+      }
+      setError('Connection to auth server failed. Please make sure the backend is running.');
     }
   };
 
